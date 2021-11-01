@@ -34,6 +34,8 @@ import org.vosk.android.StorageService;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -49,7 +51,14 @@ public class VoskActivity extends Activity implements
     static private final int STATE_MIC = 4;
 
     /* Used to handle permission request */
+    private static final int PERMISSIONS_REQUEST_ALL = 0;
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
+    private static final int PERMISSIONS_REQUEST_READ_EXT_STORAGE = 2;
+
+    private static final String[] permissions = {
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+    };
 
     private Model model;
     private SpeechService speechService;
@@ -72,9 +81,14 @@ public class VoskActivity extends Activity implements
         LibVosk.setLogLevel(LogLevel.INFO);
 
         // Check if user has given permission to record audio, init the model after permission is granted
-        int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO);
-        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSIONS_REQUEST_RECORD_AUDIO);
+        List<String> permissionsToRequest = new ArrayList<String>();
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(getApplicationContext(), permission) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(permission);
+            }
+        }
+        if (permissionsToRequest.size() > 0) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSIONS_REQUEST_ALL);
         } else {
             initModel();
         }
@@ -95,7 +109,7 @@ public class VoskActivity extends Activity implements
                                            @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == PERMISSIONS_REQUEST_RECORD_AUDIO) {
+        if (requestCode == PERMISSIONS_REQUEST_ALL) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Recognizer initialization is a time-consuming and it involves IO,
                 // so we execute it in async task
