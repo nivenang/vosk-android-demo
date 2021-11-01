@@ -16,9 +16,12 @@ package org.vosk.demo;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.ToggleButton;
@@ -32,6 +35,7 @@ import org.vosk.android.SpeechService;
 import org.vosk.android.SpeechStreamService;
 import org.vosk.android.StorageService;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -60,6 +64,9 @@ public class VoskActivity extends Activity implements
             Manifest.permission.READ_EXTERNAL_STORAGE
     };
 
+    private static final int READ_REQUEST_CODE = 77;
+
+    private Intent intent;
     private Model model;
     private SpeechService speechService;
     private SpeechStreamService speechStreamService;
@@ -103,7 +110,6 @@ public class VoskActivity extends Activity implements
                 (exception) -> setErrorState("Failed to unpack the model" + exception.getMessage()));
     }
 
-
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -146,6 +152,10 @@ public class VoskActivity extends Activity implements
         if (speechStreamService != null) {
             speechStreamService = null;
         }
+
+        if (intent != null) {
+            intent = null;
+        }
     }
 
     @Override
@@ -186,13 +196,6 @@ public class VoskActivity extends Activity implements
                 findViewById(R.id.recognize_mic).setEnabled(true);
                 findViewById(R.id.pause).setEnabled((false));
                 break;
-            case STATE_FILE:
-                ((Button) findViewById(R.id.recognize_file)).setText(R.string.stop_file);
-                resultView.setText(getString(R.string.starting));
-                findViewById(R.id.recognize_mic).setEnabled(false);
-                findViewById(R.id.recognize_file).setEnabled(true);
-                findViewById(R.id.pause).setEnabled((false));
-                break;
             case STATE_MIC:
                 ((Button) findViewById(R.id.recognize_mic)).setText(R.string.stop_microphone);
                 resultView.setText(getString(R.string.say_something));
@@ -213,25 +216,70 @@ public class VoskActivity extends Activity implements
     }
 
     private void recognizeFile() {
-        if (speechStreamService != null) {
+
+        if (intent != null && speechStreamService != null) {
             setUiState(STATE_DONE);
             speechStreamService.stop();
             speechStreamService = null;
-        } else {
-            setUiState(STATE_FILE);
-            try {
-                Recognizer rec = new Recognizer(model, 16000.f, "[\"one zero zero zero one\", " +
-                        "\"oh zero one two three four five six seven eight nine\", \"[unk]\"]");
+            intent = null;
+            return;
+        }
 
-                InputStream ais = getAssets().open(
-                        "10001-90210-01803.wav");
-                if (ais.skip(44) != 44) throw new IOException("File too short");
+        setUiState(STATE_READY);
 
-                speechStreamService = new SpeechStreamService(rec, ais, 16000);
-                speechStreamService.start(this);
-            } catch (IOException e) {
-                setErrorState(e.getMessage());
-            }
+        if (intent == null) {
+            // ACTION_OPEN_DOCUMENT is the intent to choose a file via the system's file browser.
+            intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+
+            // Filter to only show results that can be "opened", such as a
+            // file (as opposed to a list of contacts or timezones)
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+            // Filter to show only images, using the image MIME data type.
+            // If one wanted to search for ogg vorbis files, the type would be "audio/ogg".
+            // To search for all documents available via installed storage providers,
+            // it would be "*/*".
+            intent.setType("audio/*");
+        }
+
+        try {
+            startActivityForResult(intent, READ_REQUEST_CODE);
+        } catch (Exception e) {
+            setErrorState(e.getMessage());
+        }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode,
+                                 Intent resultData) {
+
+        // The ACTION_OPEN_DOCUMENT intent was sent with the request code
+        // READ_REQUEST_CODE. If the request code seen here doesn't match, it's the
+        // response to some other intent, and the code below shouldn't run at all.
+        if (requestCode != READ_REQUEST_CODE || resultCode != Activity.RESULT_OK) {
+            return;
+        }
+
+        if (resultData == null) {
+            return;
+        }
+
+        // The document selected by the user won't be returned in the intent.
+        // Instead, a URI to that document will be contained in the return intent
+        // provided to this method as a parameter.
+        // Pull that URI using resultData.getData().
+        Uri uri = resultData.getData();
+        try {
+            Recognizer rec = new Recognizer(model, 16000.f, "[\"one zero zero zero one\", " +
+                    "\"oh zero one two three four five six seven eight nine\", \"[unk]\"]");
+
+            InputStream ais = getContentResolver().openInputStream(uri);
+
+            if (ais.skip(44) != 44) throw new IOException("File too short");
+            speechStreamService = new SpeechStreamService(rec, ais, 16000);
+            speechStreamService.start(this);
+        } catch (Exception e) {
+            setErrorState(e.getMessage());
         }
     }
 
@@ -252,11 +300,9 @@ public class VoskActivity extends Activity implements
         }
     }
 
-
     private void pause(boolean checked) {
         if (speechService != null) {
             speechService.setPause(checked);
         }
     }
-
 }
