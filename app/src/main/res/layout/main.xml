@@ -24,6 +24,14 @@
         android:textOn="@string/continueRecognition"/>
 
     <TextView
+        android:id="@+id/tooltip_text"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:gravity="bottom"
+        android:scrollbars="vertical"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
         android:id="@+id/result_text"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"

@@ -21,10 +21,12 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
-import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.ToggleButton;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
@@ -35,7 +37,6 @@ import org.vosk.android.SpeechService;
 import org.vosk.android.SpeechStreamService;
 import org.vosk.android.StorageService;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -55,7 +56,7 @@ public class VoskActivity extends Activity implements
     static private final int STATE_MIC = 4;
 
     /* Used to handle permission request */
-    private static final int PERMISSIONS_REQUEST_ALL = 0;
+    private static final int PERMISSIONS_REQUEST_CODE = 0;
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
     private static final int PERMISSIONS_REQUEST_READ_EXT_STORAGE = 2;
 
@@ -66,11 +67,15 @@ public class VoskActivity extends Activity implements
 
     private static final int READ_REQUEST_CODE = 77;
 
+    private static final int TRANSCRIPT_PLACEHOLDER_LENGTH = 12;
+
     private Intent intent;
     private Model model;
     private SpeechService speechService;
     private SpeechStreamService speechStreamService;
+    private StringBuilder transcript;
     private TextView resultView;
+    private TextView tooltipView;
 
     @Override
     public void onCreate(Bundle state) {
@@ -78,8 +83,10 @@ public class VoskActivity extends Activity implements
         setContentView(R.layout.main);
 
         // Setup layout
+        tooltipView = findViewById(R.id.tooltip_text);
         resultView = findViewById(R.id.result_text);
         setUiState(STATE_START);
+        transcript = new StringBuilder("Transcript:\n");
 
         findViewById(R.id.recognize_file).setOnClickListener(view -> recognizeFile());
         findViewById(R.id.recognize_mic).setOnClickListener(view -> recognizeMicrophone());
@@ -95,7 +102,7 @@ public class VoskActivity extends Activity implements
             }
         }
         if (permissionsToRequest.size() > 0) {
-            ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSIONS_REQUEST_ALL);
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSIONS_REQUEST_CODE);
         } else {
             initModel();
         }
@@ -115,7 +122,7 @@ public class VoskActivity extends Activity implements
                                            @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == PERMISSIONS_REQUEST_ALL) {
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Recognizer initialization is a time-consuming and it involves IO,
                 // so we execute it in async task
@@ -142,12 +149,27 @@ public class VoskActivity extends Activity implements
 
     @Override
     public void onResult(String hypothesis) {
-        resultView.append(hypothesis + "\n");
+        try {
+            JSONObject json = new JSONObject(hypothesis);
+            transcript.append(json.getString("text"));
+            transcript.append("\n");
+        } catch (JSONException je) {
+            setErrorState(je.getMessage());
+        }
+        // resultView.append(hypothesis + "\n");
     }
 
     @Override
     public void onFinalResult(String hypothesis) {
-        resultView.append(hypothesis + "\n");
+        // resultView.append(hypothesis + "\n");
+        try {
+            JSONObject json = new JSONObject(hypothesis);
+            transcript.append(json.getString("text"));
+            transcript.append("\n");
+        } catch (JSONException je) {
+            setErrorState(je.getMessage());
+        }
+        resultView.append(transcript);
         setUiState(STATE_DONE);
         if (speechStreamService != null) {
             speechStreamService = null;
@@ -160,7 +182,7 @@ public class VoskActivity extends Activity implements
 
     @Override
     public void onPartialResult(String hypothesis) {
-        resultView.append(hypothesis + "\n");
+        //resultView.append(hypothesis + "\n");
     }
 
     @Override
@@ -176,14 +198,17 @@ public class VoskActivity extends Activity implements
     private void setUiState(int state) {
         switch (state) {
             case STATE_START:
-                resultView.setText(R.string.preparing);
+                tooltipView.setText(R.string.preparing);
+                tooltipView.setMovementMethod(new ScrollingMovementMethod());
+                resultView.setText("");
                 resultView.setMovementMethod(new ScrollingMovementMethod());
                 findViewById(R.id.recognize_file).setEnabled(false);
                 findViewById(R.id.recognize_mic).setEnabled(false);
                 findViewById(R.id.pause).setEnabled((false));
                 break;
             case STATE_READY:
-                resultView.setText(R.string.ready);
+                tooltipView.setText(R.string.ready);
+                resultView.setText("");
                 ((Button) findViewById(R.id.recognize_mic)).setText(R.string.recognize_microphone);
                 findViewById(R.id.recognize_file).setEnabled(true);
                 findViewById(R.id.recognize_mic).setEnabled(true);
@@ -192,13 +217,15 @@ public class VoskActivity extends Activity implements
             case STATE_DONE:
                 ((Button) findViewById(R.id.recognize_file)).setText(R.string.recognize_file);
                 ((Button) findViewById(R.id.recognize_mic)).setText(R.string.recognize_microphone);
+                tooltipView.setText(R.string.ready);
                 findViewById(R.id.recognize_file).setEnabled(true);
                 findViewById(R.id.recognize_mic).setEnabled(true);
                 findViewById(R.id.pause).setEnabled((false));
                 break;
             case STATE_MIC:
                 ((Button) findViewById(R.id.recognize_mic)).setText(R.string.stop_microphone);
-                resultView.setText(getString(R.string.say_something));
+                tooltipView.setText(getString(R.string.say_something));
+                resultView.setText("");
                 findViewById(R.id.recognize_file).setEnabled(false);
                 findViewById(R.id.recognize_mic).setEnabled(true);
                 findViewById(R.id.pause).setEnabled((true));
@@ -209,7 +236,7 @@ public class VoskActivity extends Activity implements
     }
 
     private void setErrorState(String message) {
-        resultView.setText(message);
+        tooltipView.setText(message);
         ((Button) findViewById(R.id.recognize_mic)).setText(R.string.recognize_microphone);
         findViewById(R.id.recognize_file).setEnabled(false);
         findViewById(R.id.recognize_mic).setEnabled(false);
@@ -226,6 +253,7 @@ public class VoskActivity extends Activity implements
         }
 
         setUiState(STATE_READY);
+        transcript.setLength(TRANSCRIPT_PLACEHOLDER_LENGTH);
 
         if (intent == null) {
             // ACTION_OPEN_DOCUMENT is the intent to choose a file via the system's file browser.
@@ -290,6 +318,7 @@ public class VoskActivity extends Activity implements
             speechService = null;
         } else {
             setUiState(STATE_MIC);
+            transcript.setLength(TRANSCRIPT_PLACEHOLDER_LENGTH);
             try {
                 Recognizer rec = new Recognizer(model, 16000.0f);
                 speechService = new SpeechService(rec, 16000.0f);
