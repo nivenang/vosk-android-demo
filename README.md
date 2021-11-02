@@ -4,6 +4,8 @@ This demo implements offline speech recognition and speaker identification for m
 
 Check the [releases](https://github.com/alphacep/vosk-android-demo/releases) for pre-built binaries.
 
+Please ensure that your Android version is Android 4.1, 4.1.1 or greater.
+
 ## Documentation
 
 For documentation and instructions please visit the [Vosk Website](https://alphacephei.com/vosk/android).

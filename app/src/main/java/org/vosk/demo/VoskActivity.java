@@ -18,6 +18,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
@@ -298,13 +300,23 @@ public class VoskActivity extends Activity implements
         // Pull that URI using resultData.getData().
         Uri uri = resultData.getData();
         try {
-            Recognizer rec = new Recognizer(model, 16000.f, "[\"one zero zero zero one\", " +
-                    "\"oh zero one two three four five six seven eight nine\", \"[unk]\"]");
+            MediaExtractor mex = new MediaExtractor();
+            try {
+                mex.setDataSource(getApplicationContext(), uri, null);// the adresss location of the sound on sdcard.
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            MediaFormat mf = mex.getTrackFormat(0);
+
+            int sampleRate = mf.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+            Recognizer rec = new Recognizer(model, (float) sampleRate);
 
             InputStream ais = getContentResolver().openInputStream(uri);
 
             if (ais.skip(44) != 44) throw new IOException("File too short");
-            speechStreamService = new SpeechStreamService(rec, ais, 16000);
+            speechStreamService = new SpeechStreamService(rec, ais, (float) sampleRate);
             speechStreamService.start(this);
         } catch (Exception e) {
             setErrorState(e.getMessage());
