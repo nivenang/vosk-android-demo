@@ -2,9 +2,11 @@
 <resources>
 
     <string name="app_name">Vosk Demo</string>
-    <string name="recognize_file">Recognize File</string>
-    <string name="recognize_microphone">Recognize Microphone</string>
+    <string name="recognize_file">Input from File(s)</string>
+    <string name="recognize_folder">Input from Folder</string>
+    <string name="recognize_microphone">Input from Microphone</string>
     <string name="stop_microphone">Stop Microphone</string>
+    <string name="clear_transcript">Clear Transcript</string>
     <string name="preparing">Preparing the recognizer\n</string>
     <string name="ready">Ready\n</string>
     <string name="failed">Failed to init recognizer %s\n</string>

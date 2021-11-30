@@ -11,6 +11,12 @@
         android:text="@string/recognize_file"/>
 
     <Button
+        android:id="@+id/recognize_folder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/recognize_folder"/>
+
+    <Button
         android:id="@+id/recognize_mic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,6 +28,12 @@
         android:layout_height="wrap_content"
         android:textOff="@string/pause"
         android:textOn="@string/continueRecognition"/>
+
+    <Button
+        android:id="@+id/clear_transcript"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/clear_transcript"/>
 
     <TextView
         android:id="@+id/tooltip_text"
